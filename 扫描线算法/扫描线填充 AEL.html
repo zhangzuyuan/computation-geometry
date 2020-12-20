@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>扫描线填充</title>
+	<meta charset="utf-8">
+	<script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+
+</head>
+<body>
+	<div>
+		<button id="beginFill" onclick="Fill()">开始填充</button>
+		<button id="goBackToPreStep" onclick="Clear()">重新开始</button>
+	</div>
+	<div>
+		<canvas id="myCanvas" width="1000" height="800" style="border: 1px solid  #000000;"></canvas>
+	</div>
+	<script type="text/javascript">
+		//类的定义在最下面
+    //---------点击屏幕获取屏幕上的点并连线-------
+		//点击屏幕获取数据点
+		var points= [];//存储点的信息的数组
+		var lines=[];//定义存储边的信息的数组
+		//点击屏幕获得点的坐标
+		const canvas =document.getElementById('myCanvas');//获得画布
+		var ctx = canvas.getContext("2d");//往上面画
+		ctx.strokeStyle="#00a";//线的颜色
+		ctx.lineWidth = 1;//线的宽度
+		var flag=false;
+		var flagg;
+		var top1=0,top2=0,tail=0,start=0;
+		var t_m=0.0;
+
+		var AEL=[],head=[];
+		var xmin=2147483647;
+		var xmax=0;
+		var ymin=2147483647;//点最低的y值
+		var ymax = 0;//点最高的y值
+		var num=0;//存到第几个点了
+		//绘制多边形图像，监听点击事件
+		function max(a,b){
+			if (a>b) return a;
+			return b;
+		}
+		function min(a,b){
+			if(a<b) return a;
+			return b;
+		}
+		canvas.addEventListener("click",function(e){//e为点击事件
+		if(flag==false){//在点击填充后就不再加点了
+			var tmpNode= new node();//每次点击新建一个点
+			var addedge;//每次点击添加的边
+			tmpNode.x=e.offsetX//获得点的横坐标
+			tmpNode.y=e.offsetY//获得点的纵坐标
+			//记录最大点和最小点的y坐标
+			ymin= min(ymin,tmpNode.y);
+			ymax= max(ymax,tmpNode.y);
+			xmin= min(xmin,tmpNode.x);
+			xmax= max(xmax,tmpNode.x);
+			points[num]=tmpNode;//把点加入数组中
+			if(num>=1)//开始画线
+			{
+				ctx.beginPath();//开始画线
+				ctx.moveTo(points[num-1].x,points[num-1].y);//起点
+				ctx.lineTo(points[num].x,points[num].y);//终点
+				ctx.closePath();//关闭画线
+				ctx.stroke();
+
+				//连边
+				if(points[num].y<points[num-1].y) t_b = points[num].x;
+				else t_b=points[num-1].x;
+
+				if(points[num].y!=points[num-1].y){
+					t_m = (points[num].x - points[num - 1].x) / (points[num].y - points[num - 1].y);
+					addedge={
+						x_bottom:t_b,
+						y_high : max(points[num].y,points[num-1].y),
+						y_low: min(points[num].y,points[num-1].y),
+						m:t_m,
+						next:0
+					};
+					lines[top1]=addedge;
+					top1++;
+				}
+
+			}
+
+			num++;
+		}
+		},false);
+
+
+	    //开始填充，点击button时候执行
+	    function Fill(){
+	    	flag=true;//点击填充后就不允许加点
+	    	//先把最后一个点和第一个点连接起来
+	    	ctx.beginPath();//开始画线
+			ctx.moveTo(points[points.length-1].x,points[points.length-1].y);//起点
+			ctx.lineTo(points[0].x,points[0].y);//起点
+			ctx.closePath();//关闭画线
+			ctx.stroke();
+
+			//同时连接最后一个点和第一个点的边
+			if(points[num-1].y<points[0].y) t_b = points[num-1].x;
+			else t_b=points[0].x;
+			if(points[num-1].y!=points[0].y){
+				t_m = (points[num-1].x - points[0].x) / (points[num-1].y - points[0].y);
+				addedge={
+					x_bottom:t_b,
+					y_high : max(points[num-1].y,points[0].y),
+					y_low: min(points[num-1].y,points[0].y),
+					m:t_m,
+					next:0
+				};
+				lines[top1]=addedge;
+				top1++;
+			}
+
+	    	//var button_Fill = document.getElementById("beginFill");
+		    //测试按钮作用
+		    //button_Fill.innerHTML="成功改变";
+
+		    //------开始填充
+
+		    //由高到低进行扫描画填充线y值在屏幕上面是反着的
+		    var t_now;//
+		    for(var i=ymin;i<=ymax;i++)//先把每个y像素的点的头部赋值为-1
+		    	head[i]=-1;//顶部点指出的点
+		    lines.sort(function(a,b){return b.x_bottom-a.x_bottom});//将lines按照x
+		    for(var i=0;i<top1;++i){//寻找所有存的边
+		    	lines[i].next=head[lines[i].y_low];//这条边的下一个是它顶部的边指出的边
+		    	head[lines[i].y_low]=i;//顶部点指出的最后一个边是现在遍历到的
+		    }
+		    //AEL
+		    AEL[0]={//AEL
+		    	x:0,
+		    	m:0,
+		    	y_high:0,
+		    	next:0
+		    };
+		    top2++;
+
+		    for(var i=ymin;i<=ymax;++i){
+		    	var now=head[i];//从这个边y值指出的最后一个边的位置
+		    	while(now>-1){//如果指向的上一个边还有边的话就继续找
+		    		var addedge={//在AEL中添加点
+		    			x:lines[now].x_bottom,
+		    			m:lines[now].m,
+		    			y_high:lines[now].y_high,
+		    			next:0
+		    		};
+		    		AEL[top2]=addedge;//先往AEL里面填充
+		    		t_now=0;
+		    		flagg=false;
+
+		    		while(true){
+		    			if((AEL[t_now].x <= AEL[top2].x) && (AEL[top2].x <= AEL[AEL[t_now].next].x)) {
+		    			  AEL[top2].next = AEL[t_now].next;
+                          AEL[t_now].next = top2;
+                          flagg = true;
+                          break;
+		    			}
+		    			if(AEL[t_now].next!=0)
+                          t_now=AEL[t_now].next;
+                        else
+                          break;
+		    		}
+		    		if(flagg==false)
+		    			AEL[t_now].next=top2;
+                    top2++;
+                    now=lines[now].next;
+		    	}
+		    	t_now = AEL[0].next;
+		    	flagg=false;
+
+		    	while(true){
+		    		if(AEL[t_now].next==0) break;
+		    		if(flagg==false){
+
+		    			//function sleep(d){
+  						//	for(var t = Date.now();Date.now() - t <= d;);
+						//}
+						//sleep(5000); // 延时函数，单位ms
+
+		    			ctx.strokeStyle = "#0af";
+		                ctx.beginPath();
+		                ctx.moveTo(AEL[t_now].x,i);
+                        ctx.lineTo(AEL[AEL[t_now].next].x,i);
+                        ctx.closePath();//关闭画线
+                        ctx.stroke();
+                        flagg=true;
+		    		}
+		    		else flagg=false;
+		    		t_now=AEL[t_now].next;
+		    	}
+		    	t_now=0;
+		    	while(true){
+		    		if(AEL[t_now].next==0)
+                      break;
+                  if(AEL[AEL[t_now].next].y_high<=i+1) {
+                      AEL[t_now].next = AEL[AEL[t_now].next].next;
+                      continue;
+                  }
+                  else
+                      AEL[AEL[t_now].next].x += AEL[AEL[t_now].next].m;
+                  if(AEL[AEL[t_now].next].x<AEL[t_now].x){
+                      var tem={
+                          x:AEL[t_now].x,
+                          m:AEL[t_now].m,
+                          y_high:AEL[t_now].y_high
+                      }
+                      AEL[t_now].x=AEL[AEL[t_now].next].x;
+                      AEL[t_now].m=AEL[AEL[t_now].next].m;
+                      AEL[t_now].y_high=AEL[AEL[t_now].next].y_high;
+                      AEL[AEL[t_now].next].x=tem.x;
+                      AEL[AEL[t_now].next].m=tem.m;
+                      AEL[AEL[t_now].next].y_high=tem.y_high;
+                  }
+                  t_now=AEL[t_now].next;
+		    	}
+		    }
+		}
+
+
+
+	    //-------刷新界面重新开始-------
+	    function Clear(){
+	    	points.splice(0,points.length);//清空存储点的信息的数组
+			lines.splice(0,lines.length);//清空存储边的信息的数组
+			AEL.splice(0,AEL.length);
+			head.splice(0,head.length);
+			//点击屏幕获得点的坐标
+			canvas.height=canvas.height//重新定义高度清空画布
+
+			ctx.strokeStyle="#00a";//线的颜色
+			ctx.lineWidth = 1;//线的宽度
+			flag=false;
+			ymin=10000;//点最低的y值
+			ymax = 0;//点最高的y值
+			num=0;//存到第几个点了
+		//点击屏幕获得点的坐标
+			ctx.strokeStyle="#00a";//线的颜色
+			ctx.lineWidth = 1;//线的宽度
+			flag=false;
+			top1=0,top2=0,tail=0,start=0;
+			t_m=0.0;
+
+			AEL=[],head=[];
+			xmin=2147483647;
+			xmax=0;
+			ymin=2147483647;//点最低的y值
+			ymax = 0;//点最高的y值
+			num=0;//存到第几个点了
+	    }
+
+
+        //-------定义的类--------
+        //点的结构体
+        function node(){//点的结构体
+			this.x = 0;
+			this.y = 0;
+		}
+	</script>
+</body>
+</html>
